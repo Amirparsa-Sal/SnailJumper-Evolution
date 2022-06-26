@@ -81,16 +81,8 @@ class NeuralNetwork:
         :param x: Input vector which is a numpy array.
         :return: Output vector
         """
-        self.a[0] = self.__normalize(X)
+        self.a[0] = X
         for i in range (len(self.a) - 2):
             self.a[i + 1] = self.activation(np.dot(self.weights[i], self.a[i]) + self.biases[i])
         self.a[-1] = self.last_layer_activation.activation(np.dot(self.weights[-1], self.a[-2]) + self.biases[-1])
         return self.a[-1]
-
-    def __normalize(self, X):
-        """
-        Normalize the input vector.
-        :param X: Input vector.
-        :return: Normalized input vector.
-        """
-        return (X - np.min(X)) / (np.max(X) - np.min(X))
