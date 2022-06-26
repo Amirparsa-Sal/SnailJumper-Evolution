@@ -35,7 +35,7 @@ class Player(pygame.sprite.Sprite):
         if self.game_mode == "Neuroevolution":
             self.fitness = 0  # Initial fitness
 
-            self.layer_sizes = [14, 20, 3]  # TODO (Design your architecture here by changing the values)
+            self.layer_sizes = [13, 20, 3]  # TODO (Design your architecture here by changing the values)
             self.nn = NeuralNetwork(self.layer_sizes, hidden_activation='tanh', last_layer_activation='softmax')
 
     def think(self, screen_width, screen_height, obstacles, player_x, player_y):
@@ -53,11 +53,10 @@ class Player(pygame.sprite.Sprite):
         """
         X = np.zeros((self.layer_sizes[0], 1))
         X[0, 0] = player_x / screen_width
-        X[1, 0] = player_y / screen_height
-        obstacle_count = min(len(obstacles) * 2, self.layer_sizes[1] - 2) // 2
+        obstacle_count = min(len(obstacles) * 2, self.layer_sizes[1] - 1) // 2
         for i in range(obstacle_count):
-            X[2 + i, 0] = obstacles[i]['x'] / screen_width
-            X[2 + i + obstacle_count, 0] = obstacles[i]['y'] / screen_height
+            X[1 + i, 0] = obstacles[i]['x'] / screen_width
+            X[1 + i + obstacle_count, 0] = obstacles[i]['y'] / screen_height
 
         result = self.nn.forward(X)
         index = np.argmax(result)
