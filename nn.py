@@ -28,13 +28,19 @@ class LeakyRelu(ActicationFunction):
     def activation(self, X):
         return np.maximum(0.01 * X, X)
 
+class Softmax(ActicationFunction):
+
+    def activation(self, X):
+        return np.exp(X) / np.sum(np.exp(X))
+
 class ActivationFunctionFactory:
 
     activations = {
         "sigmoid": Sigmoid(),
         "tanh": Tanh(),
         "relu": ReLU(),
-        "leaky_relu": LeakyRelu()
+        "leaky_relu": LeakyRelu(),
+        "softmax": Softmax()
     }
 
     @classmethod
