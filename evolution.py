@@ -63,7 +63,7 @@ class SUSSelectionStrategy(SelectionStrategy):
         return next_population
 
 class QTournamentSelectionStrategy(SelectionStrategy):
-    def __init__(self, q, replace=True) -> None:
+    def __init__(self, q) -> None:
         super().__init__()
         self.q = q
     
@@ -83,10 +83,17 @@ class QTournamentSelectionStrategy(SelectionStrategy):
             next_population.append(best_player)
         return next_population
 
+class AllSelectionStrategy(SelectionStrategy):
+    
+    def select(self, population: List[Player], num_selection: int) -> List[Player]:
+        return population
+
 class Evolution:
-    def __init__(self, next_population_strategy: SelectionStrategy = KBestSelectionStrategy()):
+    def __init__(self, next_population_strategy: SelectionStrategy = KBestSelectionStrategy(), \
+                parent_selection_strategy: SelectionStrategy = AllSelectionStrategy()):
         self.game_mode = "Neuroevolution"
         self.next_population_strategy = next_population_strategy
+        self.parent_selection_strategy = parent_selection_strategy
 
     def next_population_selection(self, players, num_players):
         """
@@ -113,7 +120,10 @@ class Evolution:
         if first_generation:
             return [Player(self.game_mode) for _ in range(num_players)]
         else:
-            # TODO ( Parent selection and child generation )
+            # parent_selection
+            parents = self.parent_selection_strategy.select(prev_players, num_players)
+            # cxrossover
+            # mutation
             new_players = prev_players  # DELETE THIS AFTER YOUR IMPLEMENTATION
             return new_players
 
