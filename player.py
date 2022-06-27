@@ -35,7 +35,7 @@ class Player(pygame.sprite.Sprite):
         if self.game_mode == "Neuroevolution":
             self.fitness = 0  # Initial fitness
 
-            self.layer_sizes = [13, 20, 3]  # TODO (Design your architecture here by changing the values)
+            self.layer_sizes = [7, 15, 3]  # TODO (Design your architecture here by changing the values)
             self.nn = NeuralNetwork(self.layer_sizes, hidden_activation='tanh', last_layer_activation='softmax')
 
     def think(self, screen_width, screen_height, obstacles, player_x, player_y):
