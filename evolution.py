@@ -1,10 +1,10 @@
-from sqlite3 import paramstyle
 from player import Player
 from abc import ABC, abstractmethod
 from typing import List, Tuple
 import numpy as np
 import pickle
 import os
+import random
 
 ################ Selection Strategies ################
 
@@ -56,18 +56,20 @@ class SUSSelectionStrategy(SelectionStrategy):
         for player in population:
             sum_fitness += player.fitness
             accumulated_fitness.append(sum_fitness)
+        accumulated_fitness = [acc/sum_fitness for acc in accumulated_fitness]
         # create second ruler
-        second_ruler_start = np.random.random()
-        second_ruler = [second_ruler_start + i / num_selection for i in range(num_selection)]
+        second_ruler_start = np.random.uniform(0, 1/num_selection)
+        second_ruler = np.linspace(second_ruler_start, 1, num_selection)
         # find the player with the random number
         next_population = []
-        for i in range(len(accumulated_fitness)):
-            if accumulated_fitness[i] >= second_ruler[i]:
-                selected_player = population[i]
-                break
-        # add the selected player to the next population
-        selected_player = selected_player if not clone else selected_player.clone()
-        next_population.append(selected_player)
+        i = 0
+        for j in range(len(second_ruler)):
+            if second_ruler[j] >= accumulated_fitness[i]:
+                i += 1
+            next_population.append(population[i])
+        
+        # f_list = [p.fitness for p in next_population]
+        # print('population:', f_list)
         return next_population
 
 class QTournamentSelectionStrategy(SelectionStrategy):
@@ -78,9 +80,10 @@ class QTournamentSelectionStrategy(SelectionStrategy):
     def select(self, population: List[Player], num_selection: int, clone: bool = False) -> List[Player]:
         # select q players
         next_population = []
+        # print('fit: ', [player.fitness for player in population])
         for i in range(num_selection):
             # select q players
-            selected_players = np.random.choice(population, self.q, replace=True)
+            selected_players = np.random.choice(population, self.q, replace=False)
             # find the best player
             best_player = selected_players[0]
             for i, player in enumerate(selected_players):
@@ -90,6 +93,7 @@ class QTournamentSelectionStrategy(SelectionStrategy):
             # add the best player to the next population
             best_player = best_player if not clone else best_player.clone()
             next_population.append(best_player)
+        # print('next: ', [player.fitness for player in next_population])
         return next_population
 
 class RandomUniformSelectionStrategy(SelectionStrategy):
@@ -192,7 +196,7 @@ class MutationStrategy(ABC):
 
 class GaussianMutationStrategy(MutationStrategy):
     
-    def __init__(self, mutation_p: float, mu: float = 0, sigma: float = 0.1) -> None:
+    def __init__(self, mutation_p: float, mu: float = 0, sigma: float = 1) -> None:
         super().__init__(mutation_p)
         self.mu = mu
         self.sigma = sigma
@@ -204,17 +208,17 @@ class GaussianMutationStrategy(MutationStrategy):
         new_player = Player(player.game_mode)
         # update weights
         for i in range(len(player.nn.weights)):
-            new_player.nn.weights[i] = player.nn.weights[i] + np.random.normal(self.mu, self.sigma)
+            new_player.nn.weights[i] = player.nn.weights[i] + np.random.normal(self.mu, self.sigma, size=player.nn.weights[i].shape)
         # update biases
         for i in range(len(player.nn.biases)):
-            new_player.nn.biases[i] = player.nn.biases[i] + np.random.normal(self.mu, self.sigma)
+            new_player.nn.biases[i] = player.nn.biases[i] + np.random.normal(self.mu, self.sigma, size=player.nn.biases[i].shape)
         return new_player
 
 class Evolution:
-    def __init__(self, next_population_strategy: SelectionStrategy = KBestSelectionStrategy(), \
-                parent_selection_strategy: SelectionStrategy = QTournamentSelectionStrategy(q=5), \
-                crossover_strategy: CrossoverStrategy = ArithmeticCrossoverStrategy(crossover_p=0.5),
-                mutation_strategy: MutationStrategy = GaussianMutationStrategy(mutation_p=0.2)) -> None:
+    def __init__(self, next_population_strategy: SelectionStrategy = QTournamentSelectionStrategy(q=20), \
+                parent_selection_strategy: SelectionStrategy = SUSSelectionStrategy(), \
+                crossover_strategy: CrossoverStrategy = BLXAlphaCrossoverStrategy(crossover_p=0.4),
+                mutation_strategy: MutationStrategy = GaussianMutationStrategy(mutation_p=1, sigma = 0.5)) -> None:
         self.game_mode = "Neuroevolution"
         self.next_population_strategy = next_population_strategy
         self.parent_selection_strategy = parent_selection_strategy
@@ -234,8 +238,10 @@ class Evolution:
         :param players: list of players in the previous generation
         :param num_players: number of players that we return
         """
+        # self.print_data(players, 'before next pop selection')
         # creating next population
         next_population = self.next_population_strategy.select(players, num_players)  
+        # self.print_data(next_population, 'after next pop selection')
         # extract data
         all_fitness = [player.fitness for player in next_population]
         min_fitness = min(all_fitness)
@@ -262,14 +268,15 @@ class Evolution:
         else:
             # parent_selection
             parents = self.parent_selection_strategy.select(prev_players, num_players, clone=True)
+            random.shuffle(parents)
+            # self.print_data(parents, 'parents')
             # crossover
+            parents = [self.mutation_strategy.mutation(parent) for parent in parents]
             children = []
             for i in range(0, num_players, 2):
                 child1, child2 = self.crossover_strategy.crossover(parents[i], parents[i + 1])
                 children.append(child1)
-                children.append(child2)
-            # mutation
-            children = [self.mutation_strategy.mutation(child) for child in children]
+                children.append(child2)       
             return children
 
     def save_data(self):
@@ -277,3 +284,8 @@ class Evolution:
             os.makedirs('data')
         with open('data/evolution.pkl', 'wb') as f:
             pickle.dump(self.data, f)
+
+    def print_data(self, players: list, name: str):
+        population = sorted(players, key=lambda x: x.fitness, reverse=True)
+        f_list = [p.fitness for p in population]
+        print(name, f_list)
