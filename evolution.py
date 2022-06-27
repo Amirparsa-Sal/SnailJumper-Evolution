@@ -6,18 +6,18 @@ from abc import ABC, abstractmethod
 from typing import List
 import numpy as np
 
-class NextPopulationSelectionStrategy(ABC):
+class SelectionStrategy(ABC):
     
     @abstractmethod
     def select(self, population: List[Player], num_selection: int) -> List[Player]:
         pass
 
-class KBestSelectionStrategy(NextPopulationSelectionStrategy):
+class KBestSelectionStrategy(SelectionStrategy):
     
     def select(self, population: List[Player], num_selection: int) -> List[Player]:
         return sorted(population, key=lambda x: x.fitness, reverse=True)[:num_selection]
 
-class RouletteWheelSelectionStrategy(NextPopulationSelectionStrategy):
+class RouletteWheelSelectionStrategy(SelectionStrategy):
     
     def select(self, population: List[Player], num_selection: int) -> List[Player]:
         # calculate accumulated fitness
@@ -40,7 +40,7 @@ class RouletteWheelSelectionStrategy(NextPopulationSelectionStrategy):
             next_population.append(selected_player)
         return next_population
 
-class SUSSelectionStrategy(NextPopulationSelectionStrategy):
+class SUSSelectionStrategy(SelectionStrategy):
     
     def select(self, population: List[Player], num_selection: int) -> List[Player]:
         # calculate accumulated fitness
@@ -62,7 +62,7 @@ class SUSSelectionStrategy(NextPopulationSelectionStrategy):
         next_population.append(selected_player)
         return next_population
 
-class QTournamentSelectionStrategy(NextPopulationSelectionStrategy):
+class QTournamentSelectionStrategy(SelectionStrategy):
     def __init__(self, q, replace=True) -> None:
         super().__init__()
         self.q = q
@@ -84,7 +84,7 @@ class QTournamentSelectionStrategy(NextPopulationSelectionStrategy):
         return next_population
 
 class Evolution:
-    def __init__(self, next_population_strategy: NextPopulationSelectionStrategy = KBestSelectionStrategy()):
+    def __init__(self, next_population_strategy: SelectionStrategy = KBestSelectionStrategy()):
         self.game_mode = "Neuroevolution"
         self.next_population_strategy = next_population_strategy
 
