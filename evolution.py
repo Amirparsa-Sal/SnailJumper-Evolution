@@ -173,14 +173,51 @@ class BLXAlphaCrossoverStrategy(CrossoverStrategy):
             new_player2.nn.biases[i] = np.random.uniform(min_b - self.alpha * range_b, max_b + self.alpha * range_b)
         return new_player1, new_player2
 
+################ Mutatuon Strategies ################
+
+class MutationStrategy(ABC):
+    
+    def __init__(self, mutation_p: float) -> None:
+        self.mutation_p = mutation_p
+
+    def has_mutation(self) -> bool:
+        p = np.random.uniform(0, 1)
+        return p < self.mutation_p
+
+    @abstractmethod
+    def mutation(self, player: Player) -> Player:
+        pass
+
+class GaussianMutationStrategy(MutationStrategy):
+    
+    def __init__(self, mutation_p: float, mu: float = 0, sigma: float = 0.1) -> None:
+        super().__init__(mutation_p)
+        self.mu = mu
+        self.sigma = sigma
+
+    def mutation(self, player: Player) -> Player:
+        if not self.has_mutation():
+            return player
+        # create new player
+        new_player = Player(player.game_mode)
+        # update weights
+        for i in range(len(player.nn.weights)):
+            new_player.nn.weights[i] = player.nn.weights[i] + np.random.normal(self.mu, self.sigma)
+        # update biases
+        for i in range(len(player.nn.biases)):
+            new_player.nn.biases[i] = player.nn.biases[i] + np.random.normal(self.mu, self.sigma)
+        return new_player
+
 class Evolution:
     def __init__(self, next_population_strategy: SelectionStrategy = KBestSelectionStrategy(), \
                 parent_selection_strategy: SelectionStrategy = QTournamentSelectionStrategy(q=5), \
-                crossover_strategy: CrossoverStrategy = ArithmeticCrossoverStrategy(crossover_p=0.5)):
+                crossover_strategy: CrossoverStrategy = ArithmeticCrossoverStrategy(crossover_p=0.5),
+                mutation_strategy: MutationStrategy = GaussianMutationStrategy(mutation_p=0.2)) -> None:
         self.game_mode = "Neuroevolution"
         self.next_population_strategy = next_population_strategy
         self.parent_selection_strategy = parent_selection_strategy
         self.crossover_strategy = crossover_strategy
+        self.mutation_strategy = mutation_strategy
 
     def next_population_selection(self, players, num_players):
         """
@@ -217,5 +254,5 @@ class Evolution:
                 children.append(child1)
                 children.append(child2)
             # mutation
-            new_players = children
-            return new_players
+            children = [self.mutation_strategy.mutation(child) for child in children]
+            return children
