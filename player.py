@@ -137,7 +137,7 @@ class Player(pygame.sprite.Sprite):
         for i, player_surface in enumerate(self.player_walk):
             self.player_walk[i] = pygame.transform.flip(player_surface, flip_x=True, flip_y=False)
 
-    def clone_player(self):
+    def clone(self):
         """
         Gets a player as an input and produces a clone of that player.
         """

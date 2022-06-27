@@ -1,4 +1,5 @@
 from dataclasses import replace
+from turtle import clone
 
 from player import Player
 from abc import ABC, abstractmethod
@@ -13,12 +14,16 @@ class SelectionStrategy(ABC):
 
 class KBestSelectionStrategy(SelectionStrategy):
     
-    def select(self, population: List[Player], num_selection: int) -> List[Player]:
-        return sorted(population, key=lambda x: x.fitness, reverse=True)[:num_selection]
+    def select(self, population: List[Player], num_selection: int, clone: bool = False) -> List[Player]:
+        new_population = sorted(population, key=lambda x: x.fitness, reverse=True)[:num_selection]
+        if clone:
+            new_population = [player.clone() for player in new_population]
+        return new_population
+        
 
 class RouletteWheelSelectionStrategy(SelectionStrategy):
     
-    def select(self, population: List[Player], num_selection: int) -> List[Player]:
+    def select(self, population: List[Player], num_selection: int, clone: bool = False) -> List[Player]:
         # calculate accumulated fitness
         sum_fitness = 0
         accumulated_fitness = []
@@ -36,12 +41,13 @@ class RouletteWheelSelectionStrategy(SelectionStrategy):
                     selected_player = population[j]
                     break
             # add the selected player to the next population
+            selected_player = selected_player if not clone else selected_player.clone()
             next_population.append(selected_player)
         return next_population
 
 class SUSSelectionStrategy(SelectionStrategy):
     
-    def select(self, population: List[Player], num_selection: int) -> List[Player]:
+    def select(self, population: List[Player], num_selection: int, clone: bool = False) -> List[Player]:
         # calculate accumulated fitness
         sum_fitness = 0
         accumulated_fitness = []
@@ -58,6 +64,7 @@ class SUSSelectionStrategy(SelectionStrategy):
                 selected_player = population[i]
                 break
         # add the selected player to the next population
+        selected_player = selected_player if not clone else selected_player.clone()
         next_population.append(selected_player)
         return next_population
 
@@ -66,7 +73,7 @@ class QTournamentSelectionStrategy(SelectionStrategy):
         super().__init__()
         self.q = q
     
-    def select(self, population: List[Player], num_selection: int) -> List[Player]:
+    def select(self, population: List[Player], num_selection: int, clone: bool = False) -> List[Player]:
         # select q players
         next_population = []
         for i in range(num_selection):
@@ -79,24 +86,28 @@ class QTournamentSelectionStrategy(SelectionStrategy):
                     best_player = player
             
             # add the best player to the next population
+            best_player = best_player if not clone else best_player.clone()
             next_population.append(best_player)
         return next_population
 
 class RandomUniformSelectionStrategy(SelectionStrategy):
     
-    def select(self, population: List[Player], num_selection: int) -> List[Player]:
+    def select(self, population: List[Player], num_selection: int, clone: bool = False) -> List[Player]:
         # select players
         next_population = []
         for i in range(num_selection):
             # select a random player
             selected_player = population[np.random.randint(0, len(population))]
             # add the selected player to the next population
+            selected_player = selected_player if not clone else selected_player.clone()
             next_population.append(selected_player)
         return next_population
 
 class AllSelectionStrategy(SelectionStrategy):
     
-    def select(self, population: List[Player], num_selection: int) -> List[Player]:
+    def select(self, population: List[Player], num_selection: int, clone: bool = False) -> List[Player]:
+        if clone:
+            population = [player.clone() for player in population]
         return population
 
 class Evolution:
@@ -114,8 +125,7 @@ class Evolution:
         :param players: list of players in the previous generation
         :param num_players: number of players that we return
         """
-        next_population = self.next_population_strategy.select(players, num_players)
-
+        next_population = self.next_population_strategy.select(players, num_players)    
         # TODO (Additional: Learning curve)
         return next_population
 
@@ -132,8 +142,8 @@ class Evolution:
             return [Player(self.game_mode) for _ in range(num_players)]
         else:
             # parent_selection
-            parents = self.parent_selection_strategy.select(prev_players, num_players)
+            parents = self.parent_selection_strategy.select(prev_players, num_players, clone=True)
             # crossover
             # mutation
-            new_players = prev_players  # DELETE THIS AFTER YOUR IMPLEMENTATION
+            new_players = parents
             return new_players
