@@ -7,7 +7,6 @@ from player import Player
 from variables import global_variables
 import pygame
 
-
 def display_score():
     score = int((pygame.time.get_ticks() - start_time) / 100)
     score_surf = game_font.render(f"Score: {score}", False, (64, 64, 64))
@@ -188,6 +187,9 @@ if __name__ == '__main__':
         global_variables['events'] = pygame.event.get()
         for event in global_variables['events']:
             if event.type == pygame.QUIT:
+                # save data
+                if game_mode == "Neuroevolution":
+                    evolution.save_data()
                 pygame.quit()
                 exit()
             if game_active:
@@ -214,6 +216,7 @@ if __name__ == '__main__':
                             prev_players = []
                             create_players(mode=game_mode, player_list=current_players)
                     if clicked_exit_btn:
+                        # quit game
                         pygame.quit()
                         exit()
 

@@ -3,6 +3,8 @@ from player import Player
 from abc import ABC, abstractmethod
 from typing import List, Tuple
 import numpy as np
+import pickle
+import os
 
 ################ Selection Strategies ################
 
@@ -218,6 +220,11 @@ class Evolution:
         self.parent_selection_strategy = parent_selection_strategy
         self.crossover_strategy = crossover_strategy
         self.mutation_strategy = mutation_strategy
+        self.data = {
+            'max_fitness': [],
+            'min_fitness': [],
+            'avg_fitness': [],
+        }
 
     def next_population_selection(self, players, num_players):
         """
@@ -227,10 +234,18 @@ class Evolution:
         :param players: list of players in the previous generation
         :param num_players: number of players that we return
         """
-        print('fitnesses:', [player.fitness for player in players])
+        # creating next population
         next_population = self.next_population_strategy.select(players, num_players)  
-        print('next fitnesses:', [player.fitness for player in next_population])
-        # TODO (Additional: Learning curve)
+        # extract data
+        all_fitness = [player.fitness for player in next_population]
+        min_fitness = min(all_fitness)
+        max_fitness = max(all_fitness)
+        avg_fitness = sum(all_fitness) / len(all_fitness)
+        # add data to global variable
+        self.data['min_fitness'].append(min_fitness)
+        self.data['max_fitness'].append(max_fitness)
+        self.data['avg_fitness'].append(avg_fitness)
+
         return next_population
 
     def generate_new_population(self, num_players, prev_players=None):
@@ -256,3 +271,9 @@ class Evolution:
             # mutation
             children = [self.mutation_strategy.mutation(child) for child in children]
             return children
+
+    def save_data(self):
+        if not os.path.exists('data'):
+            os.makedirs('data')
+        with open('data/evolution.pkl', 'wb') as f:
+            pickle.dump(self.data, f)
