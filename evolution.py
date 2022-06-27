@@ -1,10 +1,10 @@
-from dataclasses import replace
-from turtle import clone
-
+from sqlite3 import paramstyle
 from player import Player
 from abc import ABC, abstractmethod
-from typing import List
+from typing import List, Tuple
 import numpy as np
+
+################ Selection Strategies ################
 
 class SelectionStrategy(ABC):
     
@@ -110,12 +110,77 @@ class AllSelectionStrategy(SelectionStrategy):
             population = [player.clone() for player in population]
         return population
 
+################ Crossover Strategies ################
+
+class CrossoverStrategy(ABC):
+    
+    def __init__(self, crossover_p: float) -> None:
+        self.crossover_p = crossover_p
+
+    def has_crossover(self) -> bool:
+        p = np.random.uniform(0, 1)
+        return p < self.crossover_p
+
+    @abstractmethod
+    def crossover(self, parent1: Player, parent2: Player) -> Tuple[Player]:
+        pass
+
+class ArithmeticCrossoverStrategy(CrossoverStrategy):
+    
+    def __init__(self, crossover_p: float, alpha: float = 0.3) -> None:
+        super().__init__(crossover_p)
+        self.alpha = alpha
+
+    def crossover(self, parent1: Player, parent2: Player) -> Tuple[Player]:
+        if not self.has_crossover():
+            return parent1, parent2
+        # create new player
+        new_player1, new_player2 = Player(parent1.game_mode), Player(parent2.game_mode)
+        # update weights
+        for i in range(len(parent1.nn.weights)):
+            new_player1.nn.weights[i] = self.alpha * parent1.nn.weights[i] + (1 - self.alpha) * parent2.nn.weights[i]
+            new_player2.nn.weights[i] = self.alpha * parent2.nn.weights[i] + (1 - self.alpha) * parent1.nn.weights[i]
+        # update biases
+        for i in range(len(parent1.nn.biases)):
+            new_player1.nn.biases[i] = self.alpha * parent1.nn.biases[i] + (1 - self.alpha) * parent2.nn.biases[i]
+            new_player2.nn.biases[i] = self.alpha * parent2.nn.biases[i] + (1 - self.alpha) * parent1.nn.biases[i]
+        return new_player1, new_player2
+
+class BLXAlphaCrossoverStrategy(CrossoverStrategy):
+        
+    def __init__(self, crossover_p: float, alpha = 0.15) -> None:
+        super().__init__(crossover_p)
+        self.alpha = alpha
+
+    def crossover(self, parent1: Player, parent2: Player) -> Tuple[Player]:
+        if not self.has_crossover():
+            return parent1, parent2
+        # create new player
+        new_player1, new_player2 = Player(parent1.game_mode), Player(parent2.game_mode)
+        # update weights
+        for i in range(len(parent1.nn.weights)):
+            min_w = np.minimum(parent1.nn.weights[i], parent2.nn.weights[i])
+            max_w = np.maximum(parent1.nn.weights[i], parent2.nn.weights[i])
+            w_range = max_w - min_w
+            new_player1.nn.weights[i] = np.random.uniform(min_w - self.alpha * w_range, max_w + self.alpha * w_range)
+            new_player2.nn.weights[i] = np.random.uniform(min_w - self.alpha * w_range, max_w + self.alpha * w_range)
+        # update biases
+        for i in range(len(parent1.nn.biases)):
+            min_b = np.minimum(parent1.nn.biases[i], parent2.nn.biases[i])
+            max_b = np.maximum(parent1.nn.biases[i], parent2.nn.biases[i])
+            range_b = max_b - min_b
+            new_player1.nn.biases[i] = np.random.uniform(min_b - self.alpha * range_b, max_b + self.alpha * range_b)
+            new_player2.nn.biases[i] = np.random.uniform(min_b - self.alpha * range_b, max_b + self.alpha * range_b)
+        return new_player1, new_player2
+
 class Evolution:
     def __init__(self, next_population_strategy: SelectionStrategy = KBestSelectionStrategy(), \
-                parent_selection_strategy: SelectionStrategy = AllSelectionStrategy()):
+                parent_selection_strategy: SelectionStrategy = QTournamentSelectionStrategy(q=5), \
+                crossover_strategy: CrossoverStrategy = ArithmeticCrossoverStrategy(crossover_p=0.5)):
         self.game_mode = "Neuroevolution"
         self.next_population_strategy = next_population_strategy
         self.parent_selection_strategy = parent_selection_strategy
+        self.crossover_strategy = crossover_strategy
 
     def next_population_selection(self, players, num_players):
         """
@@ -125,7 +190,9 @@ class Evolution:
         :param players: list of players in the previous generation
         :param num_players: number of players that we return
         """
-        next_population = self.next_population_strategy.select(players, num_players)    
+        print('fitnesses:', [player.fitness for player in players])
+        next_population = self.next_population_strategy.select(players, num_players)  
+        print('next fitnesses:', [player.fitness for player in next_population])
         # TODO (Additional: Learning curve)
         return next_population
 
@@ -144,6 +211,11 @@ class Evolution:
             # parent_selection
             parents = self.parent_selection_strategy.select(prev_players, num_players, clone=True)
             # crossover
+            children = []
+            for i in range(0, num_players, 2):
+                child1, child2 = self.crossover_strategy.crossover(parents[i], parents[i + 1])
+                children.append(child1)
+                children.append(child2)
             # mutation
-            new_players = parents
+            new_players = children
             return new_players
