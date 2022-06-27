@@ -1,4 +1,3 @@
-import copy
 from dataclasses import replace
 
 from player import Player
@@ -83,6 +82,18 @@ class QTournamentSelectionStrategy(SelectionStrategy):
             next_population.append(best_player)
         return next_population
 
+class RandomUniformSelectionStrategy(SelectionStrategy):
+    
+    def select(self, population: List[Player], num_selection: int) -> List[Player]:
+        # select players
+        next_population = []
+        for i in range(num_selection):
+            # select a random player
+            selected_player = population[np.random.randint(0, len(population))]
+            # add the selected player to the next population
+            next_population.append(selected_player)
+        return next_population
+
 class AllSelectionStrategy(SelectionStrategy):
     
     def select(self, population: List[Player], num_selection: int) -> List[Player]:
@@ -122,16 +133,7 @@ class Evolution:
         else:
             # parent_selection
             parents = self.parent_selection_strategy.select(prev_players, num_players)
-            # cxrossover
+            # crossover
             # mutation
             new_players = prev_players  # DELETE THIS AFTER YOUR IMPLEMENTATION
             return new_players
-
-    def clone_player(self, player):
-        """
-        Gets a player as an input and produces a clone of that player.
-        """
-        new_player = Player(self.game_mode)
-        new_player.nn = copy.deepcopy(player.nn)
-        new_player.fitness = player.fitness
-        return new_player
