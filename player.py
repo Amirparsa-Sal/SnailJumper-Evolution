@@ -53,18 +53,18 @@ class Player(pygame.sprite.Sprite):
         """
         X = np.zeros((self.layer_sizes[0], 1))
         X[0, 0] = player_x / screen_width
-        obstacle_count = min(len(obstacles) * 2, self.layer_sizes[1] - 1) // 2
+        obstacle_count = min(len(obstacles) * 2, self.layer_sizes[0] - 1) // 2
+
         for i in range(obstacle_count):
             X[1 + i, 0] = obstacles[i]['x'] / screen_width
             X[1 + i + obstacle_count, 0] = obstacles[i]['y'] / screen_height
 
         result = self.nn.forward(X)
-        index = np.argmax(result)
-        if index == 0:
+        best_index = np.argmax(result)
+        if best_index == 0:
             self.change_gravity('left')
-        elif index == 1:
+        elif best_index == 1:
             self.change_gravity('right')
-
 
     def change_gravity(self, new_gravity):
         """
