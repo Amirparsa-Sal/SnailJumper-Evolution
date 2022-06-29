@@ -1,3 +1,4 @@
+from copy import deepcopy
 from player import Player
 from abc import ABC, abstractmethod
 from typing import List, Tuple
@@ -58,7 +59,7 @@ class SUSSelectionStrategy(SelectionStrategy):
             accumulated_fitness.append(sum_fitness)
         accumulated_fitness = [acc/sum_fitness for acc in accumulated_fitness]
         # create second ruler
-        second_ruler_start = np.random.uniform(0, 1/num_selection)
+        second_ruler_start = np.random.uniform(0, 1/num_selection) # 0.04
         second_ruler = np.linspace(second_ruler_start, 1, num_selection)
         # find the player with the random number
         next_population = []
@@ -66,10 +67,8 @@ class SUSSelectionStrategy(SelectionStrategy):
         for j in range(len(second_ruler)):
             if second_ruler[j] >= accumulated_fitness[i]:
                 i += 1
-            next_population.append(population[i])
-        
-        # f_list = [p.fitness for p in next_population]
-        # print('population:', f_list)
+            selected_player = population[i] if not clone else population[i].clone()
+            next_population.append(selected_player)
         return next_population
 
 class QTournamentSelectionStrategy(SelectionStrategy):
@@ -179,7 +178,48 @@ class BLXAlphaCrossoverStrategy(CrossoverStrategy):
             new_player2.nn.biases[i] = np.random.uniform(min_b - self.alpha * range_b, max_b + self.alpha * range_b)
         return new_player1, new_player2
 
-################ Mutatuon Strategies ################
+class TwoPointCrossoverStrategy(CrossoverStrategy):
+    
+    def crossover(self, parent1: Player, parent2: Player) -> Tuple[Player]:
+        if not self.has_crossover():
+            return parent1, parent2
+        # create new player
+        new_player1, new_player2 = Player(parent1.game_mode), Player(parent2.game_mode)
+        for i in range(len(parent1.nn.weights)):
+            weights_shape = parent1.nn.weights[i].shape
+            new_player1.nn.weights[i] = deepcopy(parent1.nn.weights[i])
+            new_player2.nn.weights[i] = deepcopy(parent2.nn.weights[i])
+            # swap the weights
+            weights1_flatten = new_player1.nn.weights[i].flatten()
+            weights2_flatten = new_player2.nn.weights[i].flatten()
+            # select two random points
+            point1 = np.random.randint(0, weights1_flatten.shape[0])
+            point2 = np.random.randint(0, weights1_flatten.shape[0])
+            point1, point2 = min(point1, point2), max(point1, point2)
+            # swap weights
+            weights1_flatten[point1:point2], weights2_flatten[point1:point2] = weights2_flatten[point1:point2], weights1_flatten[point1:point2]
+            # reshape weights
+            new_player1.nn.weights[i] = weights1_flatten.reshape(weights_shape)
+            new_player2.nn.weights[i] = weights2_flatten.reshape(weights_shape)
+        for i in range(len(parent1.nn.biases)):
+            biases_shape = parent1.nn.biases[i].shape
+            new_player1.nn.biases[i] = deepcopy(parent1.nn.biases[i])
+            new_player2.nn.biases[i] = deepcopy(parent2.nn.biases[i])
+            # swap the biases
+            biases1_flatten = new_player1.nn.biases[i].flatten()
+            biases2_flatten = new_player2.nn.biases[i].flatten()
+            # select two random points
+            point1 = np.random.randint(0, biases1_flatten.shape[0])
+            point2 = np.random.randint(0, biases1_flatten.shape[0])
+            point1, point2 = min(point1, point2), max(point1, point2)
+            # swap biases
+            biases1_flatten[point1:point2], biases2_flatten[point1:point2] = biases2_flatten[point1:point2], biases1_flatten[point1:point2]
+            # reshape biases
+            new_player1.nn.biases[i] = biases1_flatten.reshape(biases_shape)
+            new_player2.nn.biases[i] = biases2_flatten.reshape(biases_shape)
+        return new_player1, new_player2
+
+################ Mutation Strategies ################
 
 class MutationStrategy(ABC):
     
@@ -202,23 +242,25 @@ class GaussianMutationStrategy(MutationStrategy):
         self.sigma = sigma
 
     def mutation(self, player: Player) -> Player:
-        if not self.has_mutation():
-            return player
-        # create new player
-        new_player = Player(player.game_mode)
         # update weights
         for i in range(len(player.nn.weights)):
-            new_player.nn.weights[i] = player.nn.weights[i] + np.random.normal(self.mu, self.sigma, size=player.nn.weights[i].shape)
+            for y in range(player.nn.weights[i].shape[0]):
+                for x in range(player.nn.weights[i].shape[1]):
+                    if self.has_mutation():
+                        player.nn.weights[i][y, x] += player.nn.weights[i][y, x] * 0.3 * np.random.normal(self.mu, self.sigma)
+
         # update biases
         for i in range(len(player.nn.biases)):
-            new_player.nn.biases[i] = player.nn.biases[i] + np.random.normal(self.mu, self.sigma, size=player.nn.biases[i].shape)
-        return new_player
+            for y in range(player.nn.biases[i].shape[0]):
+                if self.has_mutation():
+                    player.nn.biases[i][y, 0] += player.nn.biases[i][y, 0] * 0.3 * np.random.normal(self.mu, self.sigma)
+        return player
 
 class Evolution:
-    def __init__(self, next_population_strategy: SelectionStrategy = QTournamentSelectionStrategy(q=20), \
+    def __init__(self, next_population_strategy: SelectionStrategy = QTournamentSelectionStrategy(20), \
                 parent_selection_strategy: SelectionStrategy = SUSSelectionStrategy(), \
-                crossover_strategy: CrossoverStrategy = BLXAlphaCrossoverStrategy(crossover_p=0.4),
-                mutation_strategy: MutationStrategy = GaussianMutationStrategy(mutation_p=1, sigma = 0.5)) -> None:
+                crossover_strategy: CrossoverStrategy = TwoPointCrossoverStrategy(crossover_p=0.75),
+                mutation_strategy: MutationStrategy = GaussianMutationStrategy(mutation_p=0.1, sigma = 1)) -> None:
         self.game_mode = "Neuroevolution"
         self.next_population_strategy = next_population_strategy
         self.parent_selection_strategy = parent_selection_strategy
@@ -238,10 +280,8 @@ class Evolution:
         :param players: list of players in the previous generation
         :param num_players: number of players that we return
         """
-        # self.print_data(players, 'before next pop selection')
         # creating next population
-        next_population = self.next_population_strategy.select(players, num_players)  
-        # self.print_data(next_population, 'after next pop selection')
+        next_population = self.next_population_strategy.select(players, num_players, clone=True)  
         # extract data
         all_fitness = [player.fitness for player in next_population]
         min_fitness = min(all_fitness)
@@ -269,14 +309,14 @@ class Evolution:
             # parent_selection
             parents = self.parent_selection_strategy.select(prev_players, num_players, clone=True)
             random.shuffle(parents)
-            # self.print_data(parents, 'parents')
             # crossover
-            parents = [self.mutation_strategy.mutation(parent) for parent in parents]
             children = []
             for i in range(0, num_players, 2):
                 child1, child2 = self.crossover_strategy.crossover(parents[i], parents[i + 1])
                 children.append(child1)
-                children.append(child2)       
+                children.append(child2)  
+            # print("------------------------------------------------------------------")
+            children = [self.mutation_strategy.mutation(child) for child in children]
             return children
 
     def save_data(self):
@@ -285,7 +325,10 @@ class Evolution:
         with open('data/evolution.pkl', 'wb') as f:
             pickle.dump(self.data, f)
 
-    def print_data(self, players: list, name: str):
-        population = sorted(players, key=lambda x: x.fitness, reverse=True)
+    def print_data(self, players: list, name: str, sort=True):
+        if sort:
+            population = sorted(players, key=lambda x: x.fitness, reverse=True)
+        else:
+            population = players
         f_list = [p.fitness for p in population]
         print(name, f_list)
